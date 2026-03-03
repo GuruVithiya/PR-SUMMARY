@@ -16,7 +16,7 @@ When given a PR diff or description, you will:
 3. Highlight any potential risks, breaking changes, or areas that need closer review.
 4. Suggest a short, clear PR title if one is not provided.
 
-Keep your response structured, clear, and developer-friendly."""
+Keep your response structured, clear, and developer-friendly and return in JSON Format."""
 
 
 def handle_bedrock(event, context):
