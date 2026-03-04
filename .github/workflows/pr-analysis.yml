@@ -27,7 +27,7 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          API_URL: ${{ secrets.API_GATEWAY_URL }}
+          API_URL: https://6j4zmgo43g.execute-api.us-east-1.amazonaws.com/v1/git-webhook
         run: |
           echo "pr.diff size: $(wc -c < pr.diff) bytes"
           echo "pr.diff content: $(cat pr.diff)"
