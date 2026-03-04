@@ -20,7 +20,8 @@ jobs:
       - name: Generate diff
         id: diff
         run: |
-          git diff origin/${{ github.base_ref }}...HEAD > pr.diff
+          BASE=${{ github.base_ref || 'main' }}
+          git diff origin/$BASE...HEAD > pr.diff
 
       - name: Invoke PR Risk Generator API
         id: analysis
