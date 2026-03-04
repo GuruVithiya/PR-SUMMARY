@@ -8,7 +8,6 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
       pull-requests: write
 
@@ -21,27 +20,22 @@ jobs:
         id: diff
         run: |
           git diff origin/${{ github.base_ref }}...HEAD > pr.diff
-          echo "diff_b64=$(base64 -w0 pr.diff)" >> $GITHUB_OUTPUT
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
 
       - name: Invoke PR Risk Generator API
         id: analysis
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          API_URL: https://6j4zmgo43g.execute-api.us-east-1.amazonaws.com/v1/git-webhook
         run: |
-          DIFF_JSON=$(python3 -c 'import sys,json; print(json.dumps(open("pr.diff").read()))')
-          RESPONSE=$(curl -sf -X POST \
-            "${{ secrets.API_GATEWAY_URL }}/analyze" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"diff\": $DIFF_JSON,
-              \"pr_title\": $(echo '${{ github.event.pull_request.title }}' | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))'),
-              \"repo\": \"${{ github.repository }}\",
-              \"pr_number\": ${{ github.event.pull_request.number }}
-            }")
+          echo "pr.diff size: $(wc -c < pr.diff) bytes"
+          echo "pr.diff content: $(cat pr.diff)"
+          echo "API_URL value: [$API_URL]"
+          python3 -c "import json,os; open('payload.json','w').write(json.dumps({'diff':open('pr.diff').read(),'pr_title':os.environ['PR_TITLE'],'repo':os.environ['PR_REPO'],'pr_number':int(os.environ['PR_NUMBER'])}))" && echo "Payload built OK"
+          echo "Calling URL: [$API_URL]"
+          RESPONSE=$(curl -v -X POST "$API_URL" -H "Content-Type: application/json" -d @payload.json 2>&1)
+          echo "API Response: $RESPONSE"
           echo "response=$RESPONSE" >> $GITHUB_OUTPUT
 
       - name: Post analysis as PR comment
