@@ -1,5 +1,0 @@
-# AWS SDK - available in Lambda runtime by default, listed for local dev
-boto3>=1.34.0
-
-# Add further dependencies here as features are built
-# e.g. PyJWT for token handling when auth is added
