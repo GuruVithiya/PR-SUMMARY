@@ -30,6 +30,8 @@ jobs:
           API_URL: ${{ secrets.API_GATEWAY_URL }}
         run: |
           python3 -c "import json,os; open('payload.json','w').write(json.dumps({'diff':open('pr.diff').read(),'pr_title':os.environ['PR_TITLE'],'repo':os.environ['PR_REPO'],'pr_number':int(os.environ['PR_NUMBER'])}))"
+          echo "Payload size: $(wc -c < payload.json) bytes"
+          echo "Calling URL: [$API_URL]"
           RESPONSE=$(curl -s -X POST "$API_URL" -H "Content-Type: application/json" -d @payload.json)
           echo "API Response: $RESPONSE"
           echo "response=$RESPONSE" >> $GITHUB_OUTPUT
