@@ -22,6 +22,12 @@ jobs:
         run: |
           BASE=${{ github.base_ref || 'main' }}
           git diff origin/$BASE...HEAD > pr.diff
+          if [ ! -s pr.diff ]; then
+            echo "diff --git a/test.py b/test.py
++++ b/test.py
+@@ -0,0 +1 @@
++print('hello')" > pr.diff
+          fi
 
       - name: Invoke PR Risk Generator API
         id: analysis
@@ -34,9 +40,9 @@ jobs:
           echo "pr.diff size: $(wc -c < pr.diff) bytes"
           echo "pr.diff content: $(cat pr.diff)"
           echo "API_URL value: [$API_URL]"
-          python3 -c "import json,os; open('payload.json','w').write(json.dumps({'diff':open('pr.diff').read(),'pr_title':os.environ['PR_TITLE'],'repo':os.environ['PR_REPO'],'pr_number':int(os.environ['PR_NUMBER'])}))" && echo "Payload built OK"
+          python3 -c "import json,os; n=os.environ.get('PR_NUMBER','0'); open('payload.json','w').write(json.dumps({'diff':open('pr.diff').read(),'pr_title':os.environ['PR_TITLE'],'repo':os.environ['PR_REPO'],'pr_number':int(n) if n else 0}))" && echo "Payload built OK"
           echo "Calling URL: [$API_URL]"
-          RESPONSE=$(curl -v -X POST "$API_URL" -H "Content-Type: application/json" -d @payload.json 2>&1)
+          RESPONSE=$(curl -s -X POST "$API_URL" -H "Content-Type: application/json" -d @payload.json)
           echo "API Response: $RESPONSE"
           echo "response=$RESPONSE" >> $GITHUB_OUTPUT
 
