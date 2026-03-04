@@ -23,22 +23,27 @@ jobs:
 
       - name: Invoke PR Risk Generator API
         id: analysis
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          API_URL: ${{ secrets.API_GATEWAY_URL }}
         run: |
-          PAYLOAD=$(python3 -c "
-import json
+          python3 << 'EOF'
+import json, os
 payload = json.dumps({
     'diff': open('pr.diff').read(),
-    'pr_title': '${{ github.event.pull_request.title }}',
-    'repo': '${{ github.repository }}',
-    'pr_number': ${{ github.event.pull_request.number }}
+    'pr_title': os.environ['PR_TITLE'],
+    'repo': os.environ['PR_REPO'],
+    'pr_number': int(os.environ['PR_NUMBER'])
 })
-print(payload)
-")
-          echo "Calling API: ${{ secrets.API_GATEWAY_URL }}/analyze"
+with open('payload.json', 'w') as f:
+    f.write(payload)
+EOF
           RESPONSE=$(curl -s -X POST \
-            "${{ secrets.API_GATEWAY_URL }}/analyze" \
+            "$API_URL/analyze" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
+            -d @payload.json)
           echo "API Response: $RESPONSE"
           echo "response=$RESPONSE" >> $GITHUB_OUTPUT
 
