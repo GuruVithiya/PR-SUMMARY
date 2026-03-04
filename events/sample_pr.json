@@ -1,0 +1,7 @@
+{
+  "diff": "diff --git a/src/auth.py b/src/auth.py\nindex 1234567..abcdefg 100644\n--- a/src/auth.py\n+++ b/src/auth.py\n@@ -10,6 +10,12 @@ def login(username, password):\n     user = db.get_user(username)\n     if not user:\n         return None\n+\n+    # Rate limit: max 5 attempts per minute\n+    attempts = cache.get(f'login:{username}', 0)\n+    if attempts >= 5:\n+        raise RateLimitError('Too many login attempts')\n+    cache.incr(f'login:{username}', ttl=60)\n     return verify_password(password, user.password_hash)",
+  "pr_title": "Add rate-limiting to login endpoint",
+  "pr_description": "Prevents brute-force attacks by limiting login attempts to 5 per minute per username.",
+  "repo": "org/my-app",
+  "pr_number": 42
+}
