@@ -4,25 +4,35 @@ pr-analysis:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   before_script:
-    - pip install awscli --quiet
-    - apt-get update -qq && apt-get install -y curl jq --quiet
+    - apt-get update -qq && apt-get install -y curl jq -y
+    - pip install pydantic --quiet
   script:
     - git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD > pr.diff
     - |
-      DIFF_JSON=$(python3 -c 'import json; print(json.dumps(open("pr.diff").read()))')
-      RESPONSE=$(curl -sf -X POST "$API_GATEWAY_URL/analyze" \
-        -H "Content-Type: application/json" \
-        -d "{\"diff\": $DIFF_JSON,
-             \"pr_title\": \"$CI_MERGE_REQUEST_TITLE\",
-             \"repo\": \"$CI_PROJECT_PATH\",
-             \"pr_number\": $CI_MERGE_REQUEST_IID}")
-      echo "$RESPONSE" | jq .
-      NOTE=$(echo "$RESPONSE" | jq -r \
-        '"**Tag:** `\(.modification_tag)`\n\n**Summary:** \(.summary)\n\n**Risks:**\n" +
-         (.risk_notes | map("- " + .) | join("\n"))')
-      curl -sf --request POST \
-        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/notes" \
-        --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-        --data-urlencode "body=$NOTE"
-  variables:
-    API_GATEWAY_URL: $API_GATEWAY_URL
+      python3 -c "
+      import json, os
+      payload = {
+        'diff': open('pr.diff').read(),
+        'pr_title': os.environ.get('CI_MERGE_REQUEST_TITLE', ''),
+        'repo': os.environ.get('CI_PROJECT_PATH', ''),
+        'pr_number': int(os.environ.get('CI_MERGE_REQUEST_IID', 0))
+      }
+      open('payload.json', 'w').write(json.dumps(payload))
+      "
+    - RESPONSE=$(curl -s -X POST "${API_GATEWAY_URL}" -H "Content-Type: application/json" -d @payload.json)
+    - echo "API Response ${RESPONSE}"
+    - |
+      BODY=$(echo "${RESPONSE}" | jq -r '.body')
+      TAG=$(echo "${BODY}" | jq -r '.modification_tag')
+      SUMMARY=$(echo "${BODY}" | jq -r '.summary')
+      RISKS=$(echo "${BODY}" | jq -r '.risk_notes | map("- " + .) | join("\n")')
+      NOTE="**Tag:** ${TAG}
+
+      **Summary:** ${SUMMARY}
+
+      **Risks:**
+      ${RISKS}"
+      curl -s --request POST \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes" \
+        --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+        --data-urlencode "body=${NOTE}"
