@@ -17,5 +17,3 @@ pr-analysis:
         "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/notes" \
         --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
         --data-urlencode "body=$NOTE"
-  variables:
-    API_GATEWAY_URL: $API_GATEWAY_URL
