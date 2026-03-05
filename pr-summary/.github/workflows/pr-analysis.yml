@@ -29,12 +29,19 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           API_URL: https://6j4zmgo43g.execute-api.us-east-1.amazonaws.com/v1/git-webhook
         run: |
+          if [ ! -s pr.diff ]; then
+            echo "No code changes detected. Skipping analysis."
+            echo "response=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           python3 -c "import json,os; n=os.environ.get('PR_NUMBER','0'); open('payload.json','w').write(json.dumps({'diff':open('pr.diff').read(),'pr_title':os.environ['PR_TITLE'],'repo':os.environ['PR_REPO'],'pr_number':int(n) if n else 0}))"
           RESPONSE=$(curl -s -X POST "$API_URL" -H "Content-Type: application/json" -d @payload.json)
           echo "API Response: $RESPONSE"
-          echo "response=$RESPONSE" >> $GITHUB_OUTPUT
+          BODY=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.loads(sys.stdin.read())['body'])")
+          echo "response=$BODY" >> $GITHUB_OUTPUT
 
       - name: Post analysis as PR comment
+        if: steps.analysis.outputs.response != ''
         uses: actions/github-script@v7
         with:
           script: |
