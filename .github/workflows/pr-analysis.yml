@@ -1,0 +1,69 @@
+name: PR Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate diff
+        id: diff
+        run: |
+          BASE=${{ github.base_ref || 'main' }}
+          git diff origin/$BASE...HEAD > pr.diff
+          if [ ! -s pr.diff ]; then
+            echo "diff --git a/test.py b/test.py
++++ b/test.py
+@@ -0,0 +1 @@
++print('hello')" > pr.diff
+          fi
+
+      - name: Invoke PR Risk Generator API
+        id: analysis
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          API_URL: https://6j4zmgo43g.execute-api.us-east-1.amazonaws.com/v1/git-webhook
+        run: |
+          echo "pr.diff size: $(wc -c < pr.diff) bytes"
+          echo "pr.diff content: $(cat pr.diff)"
+          echo "API_URL value: [$API_URL]"
+          python3 -c "import json,os; n=os.environ.get('PR_NUMBER','0'); open('payload.json','w').write(json.dumps({'diff':open('pr.diff').read(),'pr_title':os.environ['PR_TITLE'],'repo':os.environ['PR_REPO'],'pr_number':int(n) if n else 0}))" && echo "Payload built OK"
+          echo "Calling URL: [$API_URL]"
+          RESPONSE=$(curl -s -X POST "$API_URL" -H "Content-Type: application/json" -d @payload.json)
+          echo "API Response: $RESPONSE"
+          echo "response=$RESPONSE" >> $GITHUB_OUTPUT
+
+      - name: Post analysis as PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const analysis = JSON.parse(`${{ steps.analysis.outputs.response }}`);
+            const body = [
+              `## PR Analysis`,
+              `**Tag:** \`${analysis.modification_tag}\``,
+              `### Summary`,
+              analysis.summary,
+              `### Risk Notes`,
+              analysis.risk_notes.map(r => `- ${r}`).join('\n'),
+              `### Test Checklist`,
+              analysis.test_checklist.map(t => `- [ ] ${t}`).join('\n'),
+            ].join('\n\n');
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
