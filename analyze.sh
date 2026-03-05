@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-# Generate diff
+# Fetch target branch and generate diff
+git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
 git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD > pr.diff
 
 # Build payload
