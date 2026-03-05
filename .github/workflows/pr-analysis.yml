@@ -2,7 +2,7 @@ name: PR Analysis
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
 
 jobs:
   analyze:
@@ -29,12 +29,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           API_URL: https://6j4zmgo43g.execute-api.us-east-1.amazonaws.com/v1/git-webhook
         run: |
-          echo "pr.diff size: $(wc -c < pr.diff) bytes"
-          echo "pr.diff content: $(cat pr.diff)"
-          echo "API_URL value: [$API_URL]"
-          python3 -c "import json,os; open('payload.json','w').write(json.dumps({'diff':open('pr.diff').read(),'pr_title':os.environ['PR_TITLE'],'repo':os.environ['PR_REPO'],'pr_number':int(os.environ['PR_NUMBER'])}))" && echo "Payload built OK"
-          echo "Calling URL: [$API_URL]"
-          RESPONSE=$(curl -v -X POST "$API_URL" -H "Content-Type: application/json" -d @payload.json 2>&1)
+          python3 -c "import json,os; n=os.environ.get('PR_NUMBER','0'); open('payload.json','w').write(json.dumps({'diff':open('pr.diff').read(),'pr_title':os.environ['PR_TITLE'],'repo':os.environ['PR_REPO'],'pr_number':int(n) if n else 0}))"
+          RESPONSE=$(curl -s -X POST "$API_URL" -H "Content-Type: application/json" -d @payload.json)
           echo "API Response: $RESPONSE"
           echo "response=$RESPONSE" >> $GITHUB_OUTPUT
 
