@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: PR Summary & Risk Generator
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        DYNAMODB_TABLE_NAME: !Ref AnalysisTable
+        BEDROCK_MODEL_ID: amazon.nova-pro-v1:0
+        AWS_REGION: !Ref AWS::Region
+        LOG_LEVEL: INFO
+        MAX_TOKENS: "2048"
+        POWERTOOLS_SERVICE_NAME: pr-risk-generator
+        POWERTOOLS_METRICS_NAMESPACE: PRRiskGenerator
+
+Resources:
+  AnalysisFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/lambda_handler.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AnalysisTable
+        - Statement:
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+            Resource: !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.nova-pro-v1:0
+      Events:
+        AnalyzeAPI:
+          Type: HttpApi
+          Properties:
+            Method: POST
+            Path: /analyze
+
+  AnalysisTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: pr-analysis-results
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: modification_tag
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: modification_tag
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  ParseFailuresAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: PRRiskGenerator-ParseFailures
+      Namespace: PRRiskGenerator
+      MetricName: ParseFailures
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/analyze
+  TableName:
+    Description: DynamoDB table name
+    Value: !Ref AnalysisTable
