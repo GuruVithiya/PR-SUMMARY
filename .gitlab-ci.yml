@@ -4,7 +4,7 @@ pr-analysis:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   before_script:
-    - apt-get update -qq && apt-get install -y curl jq
+    - apt-get update -qq && apt-get install -y curl jq git
     - pip install pydantic --quiet
   script:
     - chmod +x analyze.sh
