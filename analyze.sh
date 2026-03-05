@@ -5,6 +5,12 @@ set -e
 git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
 git diff origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD > pr.diff
 
+# Check if diff is empty
+if [ ! -s pr.diff ]; then
+  echo "No code changes detected in this MR. Skipping analysis."
+  exit 0
+fi
+
 # Build payload
 python3 << 'EOF'
 import json, os
