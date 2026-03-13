@@ -32,8 +32,9 @@ BODY=$(echo "${RESPONSE}" | jq -r '.body')
 TAG=$(echo "${BODY}" | jq -r '.modification_tag')
 SUMMARY=$(echo "${BODY}" | jq -r '.summary')
 RISKS=$(echo "${BODY}" | jq -r '[.risk_notes[] | "- " + .] | join("\n")')
+CHECKLIST=$(echo "${BODY}" | jq -r '[.test_checklist[] | "- [ ] " + .] | join("\n")')
 
-NOTE=$(printf "**Tag:** %s\n\n**Summary:** %s\n\n**Risks:**\n%s" "$TAG" "$SUMMARY" "$RISKS")
+NOTE=$(printf "**Tag:** %s\n\n**Summary:** %s\n\n**Risks:**\n%s\n\n**Test Checklist:**\n%s" "$TAG" "$SUMMARY" "$RISKS" "$CHECKLIST")
 
 curl -s --request POST \
     "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes" \
