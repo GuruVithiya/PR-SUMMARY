@@ -28,12 +28,20 @@ RESPONSE=$(curl -s -X POST "${API_GATEWAY_URL}" -H "Content-Type: application/js
 echo "API Response: ${RESPONSE}"
 
 # Parse response and post MR comment
-BODY=$(echo "${RESPONSE}" | jq -r '.body')
-TAG=$(echo "${BODY}" | jq -r '.modification_tag')
-SUMMARY=$(echo "${BODY}" | jq -r '.summary')
-RISKS=$(echo "${BODY}" | jq -r '[.risk_notes[] | "- " + .] | join("\n")')
+NOTE=$(python3 << EOF
+import json, sys
 
-NOTE=$(printf "**Tag:** %s\n\n**Summary:** %s\n\n**Risks:**\n%s" "$TAG" "$SUMMARY" "$RISKS")
+response = json.loads('''${RESPONSE}''')
+body = json.loads(response['body'])
+
+tag      = body.get('modification_tag', '')
+summary  = body.get('summary', '')
+risks    = '\n'.join(f"- {r}" for r in body.get('risk_notes', []))
+checklist = '\n'.join(f"- [ ] {t}" for t in body.get('test_checklist', []))
+
+print(f"**Tag:** {tag}\n\n**Summary:** {summary}\n\n**Risks:**\n{risks}\n\n**Test Checklist:**\n{checklist}")
+EOF
+)
 
 curl -s --request POST \
     "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes" \
